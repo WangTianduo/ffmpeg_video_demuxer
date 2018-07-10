@@ -1,34 +1,3 @@
-/*
- * Copyright (c) 2012 Stefano Sabatini
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
-/**
- * @file
- * Demuxing and decoding example.
- *
- * Show how to use the libavformat and libavcodec API to demux and
- * decode audio and video data.
- * @example demuxing_decoding.c
- */
-
 #include <libavutil/imgutils.h>
 #include <libavutil/samplefmt.h>
 #include <libavutil/timestamp.h>
@@ -55,10 +24,6 @@ static AVPacket pkt;
 static int video_frame_count = 0;
 static int audio_frame_count = 0;
 
-/* Enable or disable frame reference counting. You are not supposed to support
- * both paths in your application but pick the one most appropriate to your
- * needs. Look for the use of refcount in this example to see what are the
- * differences of API usage between them. */
 static int refcount = 0;
 
 static int decode_packet(int *got_frame, int cached)
@@ -106,40 +71,7 @@ static int decode_packet(int *got_frame, int cached)
             /* write to rawvideo file */
             fwrite(video_dst_data[0], 1, video_dst_bufsize, video_dst_file);
         }
-    } else if (pkt.stream_index == audio_stream_idx) {
-        /* decode audio frame */
-        ret = avcodec_decode_audio4(audio_dec_ctx, frame, got_frame, &pkt);
-        if (ret < 0) {
-            fprintf(stderr, "Error decoding audio frame (%s)\n", av_err2str(ret));
-            return ret;
-        }
-        /* Some audio decoders decode only part of the packet, and have to be
-         * called again with the remainder of the packet data.
-         * Sample: fate-suite/lossless-audio/luckynight-partial.shn
-         * Also, some decoders might over-read the packet. */
-        decoded = FFMIN(ret, pkt.size);
-
-        if (*got_frame) {
-            size_t unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(frame->format);
-            printf("audio_frame%s n:%d nb_samples:%d pts:%s\n",
-                   cached ? "(cached)" : "",
-                   audio_frame_count++, frame->nb_samples,
-                   av_ts2timestr(frame->pts, &audio_dec_ctx->time_base));
-
-            /* Write the raw audio data samples of the first plane. This works
-             * fine for packed formats (e.g. AV_SAMPLE_FMT_S16). However,
-             * most audio decoders output planar audio, which uses a separate
-             * plane of audio samples for each channel (e.g. AV_SAMPLE_FMT_S16P).
-             * In other words, this code will write only the first audio channel
-             * in these cases.
-             * You should use libswresample or libavfilter to convert the frame
-             * to packed data. */
-            fwrite(frame->extended_data[0], 1, unpadded_linesize, audio_dst_file);
-        }
-    }
-
-    /* If we use frame reference counting, we own the data and need
-     * to de-reference it when we don't use it anymore */
+    } 
     if (*got_frame && refcount)
         av_frame_unref(frame);
 
