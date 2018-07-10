@@ -4,25 +4,22 @@
 #include <libavformat/avformat.h>
 
 static AVFormatContext *fmt_ctx = NULL;
-static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
+static AVCodecContext *video_dec_ctx = NULL;
 static int width, height;
 static enum AVPixelFormat pix_fmt;
-static AVStream *video_stream = NULL, *audio_stream = NULL;
+static AVStream *video_stream = NULL;
 static const char *src_filename = NULL;
 static const char *video_dst_filename = NULL;
-static const char *audio_dst_filename = NULL;
 static FILE *video_dst_file = NULL;
-static FILE *audio_dst_file = NULL;
 
 static uint8_t *video_dst_data[4] = {NULL};
 static int      video_dst_linesize[4];
 static int video_dst_bufsize;
 
-static int video_stream_idx = -1, audio_stream_idx = -1;
+static int video_stream_idx = -1;
 static AVFrame *frame = NULL;
 static AVPacket pkt;
 static int video_frame_count = 0;
-static int audio_frame_count = 0;
 
 static int refcount = 0;
 
@@ -164,25 +161,8 @@ int main (int argc, char **argv)
 {
     int ret = 0, got_frame;
 
-    if (argc != 4 && argc != 5) {
-        fprintf(stderr, "usage: %s [-refcount] input_file video_output_file audio_output_file\n"
-                "API example program to show how to read frames from an input file.\n"
-                "This program reads frames from a file, decodes them, and writes decoded\n"
-                "video frames to a rawvideo file named video_output_file, and decoded\n"
-                "audio frames to a rawaudio file named audio_output_file.\n\n"
-                "If the -refcount option is specified, the program use the\n"
-                "reference counting frame system which allows keeping a copy of\n"
-                "the data for longer than one decode call.\n"
-                "\n", argv[0]);
-        exit(1);
-    }
-    if (argc == 5 && !strcmp(argv[1], "-refcount")) {
-        refcount = 1;
-        argv++;
-    }
-    src_filename = argv[1];
-    video_dst_filename = argv[2];
-    audio_dst_filename = argv[3];
+    src_filename = "../resource/cdd.mp4";
+    video_dst_filename = "../resource/output.yuv";
 
     /* open input file, and allocate format context */
     if (avformat_open_input(&fmt_ctx, src_filename, NULL, NULL) < 0) {
@@ -219,21 +199,11 @@ int main (int argc, char **argv)
         video_dst_bufsize = ret;
     }
 
-    if (open_codec_context(&audio_stream_idx, &audio_dec_ctx, fmt_ctx, AVMEDIA_TYPE_AUDIO) >= 0) {
-        audio_stream = fmt_ctx->streams[audio_stream_idx];
-        audio_dst_file = fopen(audio_dst_filename, "wb");
-        if (!audio_dst_file) {
-            fprintf(stderr, "Could not open destination file %s\n", audio_dst_filename);
-            ret = 1;
-            goto end;
-        }
-    }
-
     /* dump input information to stderr */
     av_dump_format(fmt_ctx, 0, src_filename, 0);
 
-    if (!audio_stream && !video_stream) {
-        fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
+    if (!video_stream) {
+        fprintf(stderr, "Could not find video stream in the input, aborting\n");
         ret = 1;
         goto end;
     }
@@ -252,8 +222,6 @@ int main (int argc, char **argv)
 
     if (video_stream)
         printf("Demuxing video from file '%s' into '%s'\n", src_filename, video_dst_filename);
-    if (audio_stream)
-        printf("Demuxing audio from file '%s' into '%s'\n", src_filename, audio_dst_filename);
 
     /* read frames from the file */
     while (av_read_frame(fmt_ctx, &pkt) >= 0) {
@@ -276,36 +244,6 @@ int main (int argc, char **argv)
     } while (got_frame);
 
     printf("Demuxing succeeded.\n");
-
-    if (video_stream) {
-        printf("Play the output video file with the command:\n"
-               "ffplay -f rawvideo -pix_fmt %s -video_size %dx%d %s\n",
-               av_get_pix_fmt_name(pix_fmt), width, height,
-               video_dst_filename);
-    }
-
-    if (audio_stream) {
-        enum AVSampleFormat sfmt = audio_dec_ctx->sample_fmt;
-        int n_channels = audio_dec_ctx->channels;
-        const char *fmt;
-
-        if (av_sample_fmt_is_planar(sfmt)) {
-            const char *packed = av_get_sample_fmt_name(sfmt);
-            printf("Warning: the sample format the decoder produced is planar "
-                   "(%s). This example will output the first channel only.\n",
-                   packed ? packed : "?");
-            sfmt = av_get_packed_sample_fmt(sfmt);
-            n_channels = 1;
-        }
-
-        if ((ret = get_format_from_sample_fmt(&fmt, sfmt)) < 0)
-            goto end;
-
-        printf("Play the output audio file with the command:\n"
-               "ffplay -f %s -ac %d -ar %d %s\n",
-               fmt, n_channels, audio_dec_ctx->sample_rate,
-               audio_dst_filename);
-    }
 
 end:
     avcodec_free_context(&video_dec_ctx);
