@@ -157,12 +157,12 @@ static int get_format_from_sample_fmt(const char **fmt,
     return -1;
 }
 
-int main (int argc, char **argv)
+int demuxer (const char* src, const char* dst)
 {
     int ret = 0, got_frame;
 
-    src_filename = "../resource/cdd.mp4";
-    video_dst_filename = "../resource/output.yuv";
+    src_filename = src;
+    video_dst_filename = dst;
 
     /* open input file, and allocate format context */
     if (avformat_open_input(&fmt_ctx, src_filename, NULL, NULL) < 0) {
@@ -247,12 +247,9 @@ int main (int argc, char **argv)
 
 end:
     avcodec_free_context(&video_dec_ctx);
-    avcodec_free_context(&audio_dec_ctx);
     avformat_close_input(&fmt_ctx);
     if (video_dst_file)
         fclose(video_dst_file);
-    if (audio_dst_file)
-        fclose(audio_dst_file);
     av_frame_free(&frame);
     av_free(video_dst_data[0]);
 
